@@ -1,0 +1,40 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pdb
+*.egg
+*.egg-info/
+*.manifest
+*.spec
+
+# --- Virtualenv ---
+.env/
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# --- OS / IDE ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# --- Logs / Debug ---
+*.log
+
+# --- Build / Dist ---
+build/
+dist/
+*.egg-info/
+*.manifest
+
+# --- Game Assets Cache (если генерируешь что-то автоматически) ---
+*.tmp
+*.bak
+*.cache
