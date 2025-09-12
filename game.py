@@ -1,14 +1,11 @@
-import pygame
 import sys
 import math
+import random
 import numpy as np
-
 from OpenGL.GL import *
-import OpenGL.GL as gl
 from OpenGL.GL.shaders import compileProgram, compileShader
-
+import glfw
 from engine.engine import Camera, Transform, TriangleObject, load_obj, create_projection_matrix
-
 
 # Vertex shader
 vertex_shader_source = """
@@ -30,208 +27,202 @@ void main() {
 }
 """
 
+def main():
+    # Initialize GLFW
+    if not glfw.init():
+        print("Failed to initialize GLFW")
+        return
 
-# Function to render Pygame surface as OpenGL texture
-def render_text_to_texture(text_surface):
-    text_data = pygame.image.tostring(text_surface, "RGBA", True)
-    width, height = text_surface.get_size()
+    # Create window
+    window = glfw.create_window(800, 600, "PyPointEngine", None, None)
+    if not window:
+        print("Failed to create GLFW window")
+        glfw.terminate()
+        return
 
-    texture_id = glGenTextures(1)
-    glBindTexture(GL_TEXTURE_2D, texture_id)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0,
-                 GL_RGBA, GL_UNSIGNED_BYTE, text_data)
+    glfw.make_context_current(window)
+    glfw.swap_interval(1)  # Enable vsync
 
-    return texture_id, width, height
+    # Initialize OpenGL
+    glClearColor(0.1, 0.1, 0.1, 1.0)
+    glEnable(GL_DEPTH_TEST)
+    glEnable(GL_BLEND)
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
+    # Compile shaders
+    try:
+        shader = compileProgram(
+            compileShader(vertex_shader_source, GL_VERTEX_SHADER),
+            compileShader(fragment_shader_source, GL_FRAGMENT_SHADER)
+        )
+    except RuntimeError as e:
+        print(f"Shader compilation failed: {e}")
+        glfw.terminate()
+        return
 
-def draw_textured_quad(texture_id, width, height, x, y):
-    glEnable(GL_TEXTURE_2D)
-    glBindTexture(GL_TEXTURE_2D, texture_id)
+    # Load models (load each OBJ file only once)
+    tobjects = []
+    try:
+        # Load svistok.obj once
+        vertices_svistok, faces_svistok = load_obj("resources/svistok.obj", scale=0.5)
+        print(f"Svistok: {len(vertices_svistok)} vertices, {len(faces_svistok)} faces")
+        indices_svistok = [i for face in faces_svistok for i in face]
+        
+        # Create 100 instances with different positions
+        x, y = 0, 10
+        baka = False
+        for _ in range(100):
+            if baka == True:
+                x += 3
+                y += 0.5
+                obj = TriangleObject(vertices_svistok, indices_svistok, color=(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)))
+                obj.transform.position = (x, y, 0)  # Apply offset via Transform
+                tobjects.append(obj)
+                baka = False
+            else:
+                x += 3
+                y = y * -0.1
+                obj = TriangleObject(vertices_svistok, indices_svistok, color=(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)))
+                obj.transform.position = (x, y, 0)  # Apply offset via Transform
+                tobjects.append(obj)
+                baka = True
 
-    glBegin(GL_QUADS)
-    glTexCoord2f(0, 0); glVertex2f(x, y)
-    glTexCoord2f(1, 0); glVertex2f(x + width, y)
-    glTexCoord2f(1, 1); glVertex2f(x + width, y + height)
-    glTexCoord2f(0, 1); glVertex2f(x, y + height)
-    glEnd()
+        # Load sphere.obj
+        vertices, faces = load_obj("resources/sphere.obj", scale=0.5, offset=(-6, 0, 0))
+        print(f"Sphere: {len(vertices)} vertices, {len(faces)} faces")
+        indices = [i for face in faces for i in face]
+        tobjects.append(TriangleObject(vertices, indices, color=(0, 1, 1)))
 
-    glDisable(GL_TEXTURE_2D)
+        # Load model.obj
+        vertices, faces = load_obj("resources/model.obj", scale=0.5, offset=(-9, 0, 0))
+        print(f"Model: {len(vertices)} vertices, {len(faces)} faces")
+        indices = [i for face in faces for i in face]
+        tobjects.append(TriangleObject(vertices, indices, color=(0, 1, 1)))
 
+    except FileNotFoundError as e:
+        print(f"Error: {e}")
+        glfw.terminate()
+        return
 
-# Initialize Pygame and OpenGL
-game_width, game_height = 800, 600
-pygame.init()
-screen = pygame.display.set_mode((game_width, game_height), pygame.OPENGL | pygame.DOUBLEBUF)
-pygame.display.set_caption("KLGAMEENGINE")
-
-glClearColor(0.1, 0.1, 0.1, 1.0)
-glEnable(GL_DEPTH_TEST)
-glEnable(GL_BLEND)
-glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-
-clock = pygame.time.Clock()
-font = pygame.font.SysFont("arial", 20)
-
-
-# Compile shaders
-try:
-    shader = compileProgram(
-        compileShader(vertex_shader_source, GL_VERTEX_SHADER),
-        compileShader(fragment_shader_source, GL_FRAGMENT_SHADER)
-    )
-except RuntimeError as e:
-    print(f"Shader compilation failed: {e}")
-    pygame.quit()
-    sys.exit(1)
-
-
-# Load models
-tobjects = []
-try:
-    vertices3, faces3 = load_obj("resources/svistok.obj", scale=0.5, offset=(-2, 10, 0))
-    print(f"Sphere 1: {len(vertices3)} vertices, {len(faces3)} faces")
-    indices3 = []
-    for face in faces3:
-        indices3.extend(face)
-    tobjects.append(TriangleObject(vertices3, indices3, color=(0, 255, 255)))
-
-    vertices3, faces3 = load_obj("resources/sphere.obj", scale=0.5, offset=(-6, 0, 0))
-    print(f"Sphere 2: {len(vertices3)} vertices, {len(faces3)} faces")
-    indices3 = []
-    for face in faces3:
-        indices3.extend(face)
-    tobjects.append(TriangleObject(vertices3, indices3, color=(0, 255, 255)))
-
-    vertices3, faces3 = load_obj("resources/model.obj", scale=0.5, offset=(-9, 0, 0))
-    print(f"Sphere 3: {len(vertices3)} vertices, {len(faces3)} faces")
-    indices3 = []
-    for face in faces3:
-        indices3.extend(face)
-    tobjects.append(TriangleObject(vertices3, indices3, color=(0, 255, 255)))
-
-except FileNotFoundError as e:
-    print(f"Error: {e}")
-    pygame.quit()
-    sys.exit(1)
-
-
-# Setup OpenGL buffers
-for obj in tobjects:
-    obj.setup_buffers(gl)
-
-
-# Setup camera
-cam = Camera(fov=70, aspect=game_width/game_height, near=0.1, far=100.0)
-cam.transform.position = (0.0, 0.0, -10.0)
-
-proj = create_projection_matrix(cam.fov, cam.aspect, cam.near, cam.far)
-view = cam.get_view_matrix()
-
-
-# Mouse control
-pygame.event.set_grab(True)
-pygame.mouse.set_visible(False)
-mouse_sens = 0.003
-
-
-# FPS counter
-fps = 0
-last_time = pygame.time.get_ticks()
-frame_count = 0
-fps_update_interval = 1000
-
-
-while True:
-    dt = clock.tick(60) / 1000.0
-
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            sys.exit()
-
-    keys = pygame.key.get_pressed()
-    if keys[pygame.K_ESCAPE]:
-        pygame.quit()
-        sys.exit()
-
-    # Mouse look
-    mx, my = pygame.mouse.get_rel()
-    pitch, yaw, roll = cam.transform.rotation
-    new_rotation = (
-        max(-math.pi/2, min(math.pi/2, pitch - my * mouse_sens)),
-        yaw - mx * mouse_sens,
-        roll
-    )
-
-
-    # Movement
-    speed = 5.0 * dt
-    move = [0, 0, 0]
-    if keys[pygame.K_s]: move[2] += speed
-    if keys[pygame.K_w]: move[2] -= speed
-    if keys[pygame.K_a]: move[0] -= speed
-    if keys[pygame.K_d]: move[0] += speed
-    if keys[pygame.K_q]: move[1] -= speed
-    if keys[pygame.K_e]: move[1] += speed
-
-    # Compute camera axes
-    pitch, yaw, _ = new_rotation
-    forward = (math.sin(yaw), 0, math.cos(yaw))
-    right = (math.cos(yaw), 0, -math.sin(yaw))
-    up = (0, 1, 0)
-
-    new_position = (
-        cam.transform.position[0] + forward[0]*move[2] + right[0]*move[0],
-        cam.transform.position[1] + move[1],
-        cam.transform.position[2] + forward[2]*move[2] + right[2]*move[0]
-    )
-
-    # Update view matrix
-    if new_position != cam.transform.position or new_rotation != cam.transform.rotation:
-        cam.transform.position = new_position
-        cam.transform.rotation = new_rotation
-        view = cam.get_view_matrix()
-
-    # Clear screen
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-
-    # Render objects
-    glUseProgram(shader)
-    mvp_loc = glGetUniformLocation(shader, "mvp")
-    color_loc = glGetUniformLocation(shader, "color")
-
+    # Setup OpenGL buffers
+    import OpenGL.GL as gl
     for obj in tobjects:
-        model = obj.transform.get_matrix()
-        mvp = np.dot(np.dot(proj, view), model)
-        glUniformMatrix4fv(mvp_loc, 1, GL_TRUE, np.array(mvp, dtype=np.float32))
-        glUniform3fv(color_loc, 1, obj.color)
-        glBindVertexArray(obj.vao)
-        glDrawElements(GL_TRIANGLES, len(obj.indices), GL_UNSIGNED_INT, None)
-        glBindVertexArray(0)
+        obj.setup_buffers(gl)
+
+    # Setup camera
+    width, height = glfw.get_framebuffer_size(window)
+    cam = Camera(fov=70, aspect=width/height, near=0.1, far=100.0)
+    cam.transform.position = (0.0, 0.0, -10.0)
+    proj = create_projection_matrix(cam.fov, cam.aspect, cam.near, cam.far)
+    view = cam.get_view_matrix()
+
+    # Mouse control
+    glfw.set_input_mode(window, glfw.CURSOR, glfw.CURSOR_DISABLED)
+    mouse_sens = 0.003
+    last_x, last_y = width / 2, height / 2
+    first_mouse = True
 
     # FPS counter
-    frame_count += 1
-    current_time = pygame.time.get_ticks()
-    if current_time - last_time >= fps_update_interval:
-        fps = frame_count * 1000 / (current_time - last_time)
-        frame_count = 0
+    fps = 0
+    frame_count = 0
+    last_time = glfw.get_time()
+    fps_update_interval = 1.0
+
+    def framebuffer_size_callback(window, width, height):
+        nonlocal proj, cam
+        glViewport(0, 0, width, height)
+        cam.aspect = width / height
+        proj = create_projection_matrix(cam.fov, cam.aspect, cam.near, cam.far)
+
+    glfw.set_framebuffer_size_callback(window, framebuffer_size_callback)
+
+    while not glfw.window_should_close(window):
+        current_time = glfw.get_time()
+        dt = current_time - last_time if frame_count > 0 else 1/60
         last_time = current_time
 
-    fps_text = font.render(f"FPS: {fps:.1f}", True, (255, 255, 255))
+        # Handle input
+        move = [0, 0, 0]
+        speed = 5.0 * dt
+        if glfw.get_key(window, glfw.KEY_W) == glfw.PRESS:
+            move[2] -= speed
+        if glfw.get_key(window, glfw.KEY_S) == glfw.PRESS:
+            move[2] += speed
+        if glfw.get_key(window, glfw.KEY_A) == glfw.PRESS:
+            move[0] -= speed
+        if glfw.get_key(window, glfw.KEY_D) == glfw.PRESS:
+            move[0] += speed
+        if glfw.get_key(window, glfw.KEY_Q) == glfw.PRESS:
+            move[1] -= speed
+        if glfw.get_key(window, glfw.KEY_E) == glfw.PRESS:
+            move[1] += speed
+        if glfw.get_key(window, glfw.KEY_LEFT_SHIFT) == glfw.PRESS:
+            speed *= 100
+        if glfw.get_key(window, glfw.KEY_ESCAPE) == glfw.PRESS:
+            glfw.set_window_should_close(window, True)
 
-    # Switch to 2D rendering for FPS text
-    glUseProgram(0)
-    glMatrixMode(GL_PROJECTION)
-    glLoadIdentity()
-    glOrtho(0, game_width, game_height, 0, -1, 1)
-    glMatrixMode(GL_MODELVIEW)
-    glLoadIdentity()
+        # Mouse look
+        x, y = glfw.get_cursor_pos(window)
+        if first_mouse:
+            last_x, last_y = x, y
+            first_mouse = False
+        mx, my = x - last_x, last_y - y
+        last_x, last_y = x, y
 
-    # Render FPS text as texture
-    texture_id, tex_width, tex_height = render_text_to_texture(fps_text)
-    draw_textured_quad(texture_id, tex_width, tex_height, -10, -10)
-    glDeleteTextures(1, [texture_id])
+        pitch, yaw, roll = cam.transform.rotation
+        new_rotation = (
+            max(-math.pi/2, min(math.pi/2, pitch + my * mouse_sens)),
+            yaw - mx * mouse_sens,
+            roll
+        )
 
-    pygame.display.flip()
+        # Compute camera movement
+        pitch, yaw, _ = new_rotation
+        forward = (math.sin(yaw), 0, math.cos(yaw))
+        right = (math.cos(yaw), 0, -math.sin(yaw))
+        up = (0, 1, 0)
+
+        new_position = (
+            cam.transform.position[0] + forward[0]*move[2] + right[0]*move[0],
+            cam.transform.position[1] + move[1],
+            cam.transform.position[2] + forward[2]*move[2] + right[2]*move[0]
+        )
+
+        # Update view matrix
+        if new_position != cam.transform.position or new_rotation != cam.transform.rotation:
+            cam.transform.position = new_position
+            cam.transform.rotation = new_rotation
+            view = cam.get_view_matrix()
+
+        # Clear screen
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+
+        # Render objects
+        glUseProgram(shader)
+        mvp_loc = glGetUniformLocation(shader, "mvp")
+        color_loc = glGetUniformLocation(shader, "color")
+
+        for obj in tobjects:
+            model = obj.transform.get_matrix()
+            mvp = np.dot(np.dot(proj, view), model)
+            glUniformMatrix4fv(mvp_loc, 1, GL_TRUE, np.array(mvp, dtype=np.float32))
+            glUniform3fv(color_loc, 1, obj.color)
+            glBindVertexArray(obj.vao)
+            glDrawElements(GL_TRIANGLES, len(obj.indices), GL_UNSIGNED_INT, None)
+            glBindVertexArray(0)
+
+        # FPS counter
+        frame_count += 1
+        if current_time - last_time >= fps_update_interval:
+            fps = frame_count / (current_time - last_time)
+            frame_count = 0
+            last_time = current_time
+            print(f"FPS: {fps:.1f}")
+
+        glfw.swap_buffers(window)
+        glfw.poll_events()
+
+    glfw.terminate()
+
+if __name__ == "__main__":
+    main()
