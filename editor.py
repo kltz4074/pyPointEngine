@@ -69,22 +69,21 @@ def main():
         indices_svistok = [i for face in faces_svistok for i in face]
         
         # Create 100 instances with different positions
-        x, y, z = 0, 10, 0
+        x, y = 0, 10
         baka = False
         for _ in range(100):
             if baka == True:
                 x += 3
                 y += 0.5
                 obj = TriangleObject(vertices_svistok, indices_svistok, color=(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)))
-                obj.transform.position = (x, y, z)  # Apply offset via Transform
+                obj.transform.position = (x, y, 0)  # Apply offset via Transform
                 tobjects.append(obj)
                 baka = False
             else:
-                z += 4
-                x += 0
-                y += 0
+                x += 3
+                y = y * -0.1
                 obj = TriangleObject(vertices_svistok, indices_svistok, color=(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)))
-                obj.transform.position = (x, y, z)  # Apply offset via Transform
+                obj.transform.position = (x, y, 0)  # Apply offset via Transform
                 tobjects.append(obj)
                 baka = True
 
@@ -98,7 +97,7 @@ def main():
         vertices, faces = load_obj("resources/model.obj", scale=0.5, offset=(-9, 0, 0))
         print(f"Model: {len(vertices)} vertices, {len(faces)} faces")
         indices = [i for face in faces for i in face]
-        tobjects.append(TriangleObject(vertices, indices, color=(100, 255, 100, 50)))
+        tobjects.append(TriangleObject(vertices, indices, color=(0, 1, 1)))
 
     except FileNotFoundError as e:
         print(f"Error: {e}")
@@ -144,7 +143,7 @@ def main():
 
         # Handle input
         move = [0, 0, 0]
-        speed = 20.0 * dt
+        speed = 5.0 * dt
         if glfw.get_key(window, glfw.KEY_W) == glfw.PRESS:
             move[2] -= speed
         if glfw.get_key(window, glfw.KEY_S) == glfw.PRESS:
